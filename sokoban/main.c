@@ -17,17 +17,6 @@
 #define CAISSE_SUR_CIBLE '*'
 #define CIBLE '.'
 #define VIDE ' '
-#define HAUT 'z'
-#define GAUCHE 'q'
-#define DROITE 'd'
-#define BAS 's'
-#define ABANDONNER 'x'
-#define RECOMMENCER 'r'
-#define OUI 'o'
-#define NON 'n'
-#define ZOOMER '+'
-#define DEZOOMER '-'
-#define UNDO 'u'
 #define SOKOG 'g'
 #define SOKOH 'h'
 #define SOKOB 'b'
@@ -390,49 +379,6 @@ bool gagner_partie(t_Plateau plateau) {
     return true;
 }
 
-/* gère l'abandon : propose de sauvegarder */
-void afficher_abandon(t_Plateau plateau, t_tabDeplacement t, int nb) {
-    char fichier[50], fic[50], rep;
-
-
-    printf("Partie abandonnée\n");
-    printf("Sauvegarder ? (o/n) : ");
-    scanf(" %c", &rep);
-
-    if (rep == OUI) {
-        printf("Nom fichier : ");
-        scanf("%49s", fichier);
-        enregistrer_partie(plateau, fichier);
-    }
-
-    printf("enregistrer déplacements dans un fichier .dep ? (o/n)");
-    scanf(" %c", &rep);
-
-    if (rep == OUI) {
-        printf("Nom fichier (.dep) : ");
-        scanf("%49s", fic);
-        enregistrerDeplacements(t, nb, fic);
-    }
-
-}
-
-/* demande si on recommence, remet le plateau et les compteurs */
-bool afficher_recommencer(t_Plateau plateau, t_Plateau plateauInitial, int *nbDeplacements, int *ligSoko, int *colSoko) {
-    char rep;
-
-    printf("Recommencer ? (o/n) : ");
-    scanf(" %c", &rep);
-
-    if (rep == OUI) {
-        copier_plateau(plateau, plateauInitial);
-        *nbDeplacements = 0;
-        *ligSoko = ligSokoInitial;
-        *colSoko = colSokoInitial;
-        return true;
-    }
-
-    return false;
-}
 
 /* affiche l'écran final de victoire avec le plateau */
 void afficher_gagner(t_Plateau plateau, char fichier[50], int nb, int zoom, t_tabDeplacement t) {
