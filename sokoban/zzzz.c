@@ -42,7 +42,7 @@ bool traiter_victoire(typePlateau plateau);
 void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r);
 //void deplacement(typePlateau plateau, int *ligSoko, int *colSoko, typeDeplacements tableauDep);
 void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko);
-void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb);
+void chargerDeplacements(typeDeplacements t, char *fichier[50], int * nb);
 
 /* ==== MAIN ==== */
 
@@ -60,7 +60,7 @@ int main() {
     afficher_entete(fichier, nbDeplacements);
     charger_partie(plateau, fichier);
     trouver_sokoban(plateau, &ligSoko, &colSoko);
-    chargerDeplacements(t, fichierDep, &nbDeplacementsTotal);
+    chargerDeplacements(t, &fichierDep[50], &nbDeplacementsTotal);
 
     for(int i = 0; i < nbDeplacementsTotal; i++){
         int ligAncienne = ligSoko, colAncienne = colSoko;
@@ -88,7 +88,7 @@ int main() {
     //affichage de fin de partie
     bool res = traiter_victoire(plateau);
     
-    afficher_resultat(plateau, fichier, fichierDep, nbDeplacements, res);
+    afficher_resultat(plateau, fichier[50], fichierDep[50], nbDeplacements, res);
 
     return 0;
 }
@@ -250,7 +250,7 @@ void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50
 
 }
 
-void charger_partie(typePlateau plateau, char fichier[50]){
+void chargerPartie(typePlateau plateau, char fichier[50]){
     FILE * f;
     char finDeLigne;
 
@@ -269,7 +269,7 @@ void charger_partie(typePlateau plateau, char fichier[50]){
     }
 }
 
-void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb){
+void chargerDeplacements(typeDeplacements t, char *fichier[50], int * nb){
     FILE * f;
     char dep;
     *nb = 0;
