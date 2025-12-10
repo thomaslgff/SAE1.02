@@ -40,7 +40,6 @@ char retirer_caisse(char contenuCase);
 void trouver_sokoban(typePlateau plateau, int *ligSoko, int *colSoko);
 bool traiter_victoire(typePlateau plateau);
 void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r);
-//void deplacement(typePlateau plateau, int *ligSoko, int *colSoko, typeDeplacements tableauDep);
 void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko);
 void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb);
 
@@ -68,24 +67,11 @@ int main() {
         afficher_entete(fichier, nbDeplacements);
         afficher_plateau(plateau);
         deplacement(plateau, t[i], &ligSoko, &colSoko);
+        usleep(400000);
         if(ligAncienne != ligSoko || colAncienne != colSoko)
             nbDeplacements++;
         }
 
-    //     // DETERMINATION DES ACTIONS EN FONCTION DE LA TOUCHE PRESSEE
-    //     if (touche == SOKOH || touche == SOKOB || touche == SOKOG || touche == SOKOD) {
-    //         int ligAncienne = ligSoko, colAncienne = colSoko;
-    //         deplacer_sokoban(plateau, touche, &ligSoko, &colSoko, &retourTouche); // GESTION DES DEPLACEMENTS
-
-    //         if (ligAncienne != ligSoko || colAncienne != colSoko) { // ON AUNGMENTE LE NB DE DEPLACEMENT SI SOKOBAN CHANGE DE CASE
-    //             nbDeplacements++;
-    //             tableauDep[i++] = retourTouche;
-    //             if (traiter_victoire(plateau)) { gagner = true; enCours = false; } // VERIFIE SI LA PARTIE EST GAGNEE
-    //         }
-        
-    //     }
-    // }
-    //affichage de fin de partie
     bool res = traiter_victoire(plateau);
     
     afficher_resultat(plateau, fichier, fichierDep, nbDeplacements, res);
