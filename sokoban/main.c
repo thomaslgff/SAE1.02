@@ -25,8 +25,16 @@
 #define SOKOCB 'B'
 #define SOKOCD 'D'
 
+
+typedef struct{
+    int x;
+    int y;
+} position;
+
+
 typedef char typePlateau[TAILLE][TAILLE];
 typedef char typeDeplacements[NB_D_MAX];
+typedef position typePosition[NB_D_MAX]
 
 /* ==== DECLARATION FONCTIONS / PROCEDURES ==== */
 
@@ -39,16 +47,18 @@ char afficher_caisse(char contenuCase);
 char retirer_caisse(char contenuCase);
 void trouver_sokoban(typePlateau plateau, int *ligSoko, int *colSoko);
 bool traiter_victoire(typePlateau plateau);
-void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r);
-void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko);
-void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb);
+void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal);
+void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko, int *signalCaisse);
+void charger_deplacements(typeDeplacements t, char fichier[50], int * nb);
+void opti_dep(typePosition tPos, int ligSoko, int colSoko, int signalCaisse)
 
 /* ==== MAIN ==== */
 
 int main() {
     char fichier[50], fichierDep[50];
     typePlateau plateau;
-    typeDeplacements t;
+    typeDeplacements t, tOriginal;
+    typePosition tPos;
     int nbDeplacementsTotal = 0,nbDeplacements = 0, ligSoko = 0, colSoko = 0;
 
     printf("nom fichier: ");
@@ -59,22 +69,30 @@ int main() {
     afficher_entete(fichier, nbDeplacements);
     charger_partie(plateau, fichier);
     trouver_sokoban(plateau, &ligSoko, &colSoko);
-    chargerDeplacements(t, fichierDep, &nbDeplacementsTotal);
-
+    charger_deplacements(tOriginal, fichierDep, &nbDeplacementsTotal);
+    charger_deplacements(t, fichierDep, &nbDeplacementsTotal);
+    
     for(int i = 0; i < nbDeplacementsTotal; i++){
         int ligAncienne = ligSoko, colAncienne = colSoko;
         system("clear");
         afficher_entete(fichier, nbDeplacements);
         afficher_plateau(plateau);
-        deplacement(plateau, t[i], &ligSoko, &colSoko);
+        deplacement(plateau, t[i], &ligSoko, &colSoko, &signalCaisse);
         usleep(400000);
-        if(ligAncienne != ligSoko || colAncienne != colSoko)
+        if(ligAncienne != ligSoko || colAncienne != colSoko){
             nbDeplacements++;
+            tPos[i].x = ligSoko;
+            tPos[i].y = colSoko;
         }
+        else{
+            for(int a = i; a < nbDeplacementsTotal; a++)
+                t[a] = t[a+1];
+        }
+    }
 
     bool res = traiter_victoire(plateau);
     
-    afficher_resultat(plateau, fichier, fichierDep, nbDeplacements, res);
+    afficher_resultat(plateau, fichier, fichierDep, nbDeplacements, res, nbDeplacementsTotal);
 
     return 0;
 }
@@ -134,8 +152,7 @@ char afficher_caisse(char contenuCase) {
     return contenuCase;
 }
 
-void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko) {
-
+void deplacement(typePlateau plateau, char t, int *ligSoko, int *colSoko, int *signalCaisse) {
 
     int dlig = 0, dcol = 0;
     int signalCaisse = 0;
@@ -167,7 +184,7 @@ void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko) {
         return;
     }
     if ((caseSuivante == VIDE || caseSuivante == CIBLE) && signalCaisse == 0) {
-        plateau[*ligSoko][*colSoko]   = retirer_sokoban(plateau[*ligSoko][*colSoko]);
+        plateau[*ligSoko][*colSoko] = retirer_sokoban(plateau[*ligSoko][*colSoko]);
         plateau[ligSuivante][colSuivante] = afficher_sokoban(plateau[ligSuivante][colSuivante]);
         *ligSoko = ligSuivante;
         *colSoko = colSuivante;
@@ -186,10 +203,10 @@ void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko) {
         plateau[ligDerriere][colDerriere] = afficher_caisse(caseDerriere);
         plateau[ligSuivante][colSuivante] = retirer_caisse(plateau[ligSuivante][colSuivante]);
 
-        plateau[*ligSoko][*colSoko]   = retirer_sokoban(plateau[*ligSoko][*colSoko]);
+        plateau[*ligSoko][*colSoko] = retirer_sokoban(plateau[*ligSoko][*colSoko]);
         plateau[ligSuivante][colSuivante] = afficher_sokoban(plateau[ligSuivante][colSuivante]);
 
-        *ligSoko = ligSuivante;
+        *ligSoko = ligSuivante; 
         *colSoko = colSuivante;
         return;
     }
@@ -221,13 +238,14 @@ bool traiter_victoire(typePlateau plateau) {
 
 
 /* affiche l'écran final de victoire avec le plateau */
-void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r) {
+void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal) {
 
     system("clear");
     afficher_entete(fichier, nb);
     afficher_plateau(plateau);
 
     if(r){
+        printf("la longueur de la suite initiale est de %d caractères", nbDeplacementsTotal);
         printf("La suite de déplacements %s est bien une solution pour la partie %s.\n Elle contient %d déplacements.\n", fichierDep, fichier, nb);
     }
     else{
@@ -255,7 +273,7 @@ void charger_partie(typePlateau plateau, char fichier[50]){
     }
 }
 
-void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb){
+void charger_deplacements(typeDeplacements t, char fichier[50], int * nb){
     FILE * f;
     char dep;
     *nb = 0;
@@ -276,4 +294,13 @@ void chargerDeplacements(typeDeplacements t, char fichier[50], int * nb){
         }
     }
     fclose(f);
+}
+
+opti_dep(typePosition tPos, typeDeplacements t, ligSoko, colSoko, signalCaisse){
+    int Depart = 0;
+    int nbPos = 0;
+    for(int i = Depart ; i < nbPos; i++){
+        if(ligSoko == tPos[i].x && colSoko == tPos[i].y)
+         
+    }
 }
