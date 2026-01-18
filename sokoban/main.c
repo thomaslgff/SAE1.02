@@ -16,6 +16,7 @@
 #define CAISSE_SUR_CIBLE '*'
 #define CIBLE '.'
 #define VIDE ' '
+
 #define SOKOG 'g'
 #define SOKOH 'h'
 #define SOKOB 'b'
@@ -27,18 +28,14 @@
 
 const int PAUSE = 400000;
 
-
 typedef struct{
     int x;
     int y;
 } position;
 
-
 typedef char typePlateau[TAILLE][TAILLE];
 typedef char typeDeplacements[NB_D_MAX];
 typedef position typePosition[NB_D_MAX];
-
-/* ==== DECLARATION FONCTIONS / PROCEDURES ==== */
 
 void charger_partie(typePlateau plateau, char fichier[50]);
 void afficher_entete(char fichier[50], int nbDeplacements);
@@ -49,110 +46,150 @@ char afficher_caisse(char contenuCase);
 char retirer_caisse(char contenuCase);
 void trouver_sokoban(typePlateau plateau, int *ligSoko, int *colSoko);
 bool traiter_victoire(typePlateau plateau);
-void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal);
-void deplacement(typePlateau plateau,char t, int *ligSoko, int *colSoko, int *signalCaisse);
+void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal, typeDeplacements tOpti);
+void deplacement(typePlateau plateau, char t, int *ligSoko, int *colSoko, int *signalCaisse);
 void charger_deplacements(typeDeplacements t, char fichier[50], int * nb);
-void opti_dep(typePosition tPos, typeDeplacements t, int ligSoko, int colSoko, int signalCaisse, int i, int *depart, int *nbDeplacements);
-
-/* ==== MAIN ==== */
+void sauvegarder_solution(char fichierDep[50], typeDeplacements t, int nb);
+void optimiser_deplacements(typePlateau plateau, typeDeplacements t, typePosition historiquePos, position departPos, 
+                           int *nbDeplacementsRestants, int *ligSoko, int *colSoko, char fichier[50]);
 
 int main() {
     char fichier[50], fichierDep[50];
     typePlateau plateau;
-    typeDeplacements t, tOriginal;
-    typePosition tPos;
-    int nbDeplacementsTotal = 0,nbDeplacements = 0, 
-        ligSoko = 0, colSoko = 0, depart = 0, signalCaisse = 0;
+    typeDeplacements t;
+    typePosition historiquePos;
 
-    printf("nom fichier: ");
+    int nbDeplacementsTotal = 0;
+    int nbDeplacementsRestants = 0;
+    int ligSoko = 0, colSoko = 0;
+    
+    position departPos;
+
+    printf("nom fichier partie (ex: niveau.sok): ");
     scanf("%49s", fichier);
-    printf("nom fichier deplacements: ");
+    printf("nom fichier deplacements (ex: solution.dep): ");
     scanf("%49s", fichierDep);
 
-    afficher_entete(fichier, nbDeplacements);
     charger_partie(plateau, fichier);
     trouver_sokoban(plateau, &ligSoko, &colSoko);
-    charger_deplacements(tOriginal, fichierDep, &nbDeplacementsTotal);
+    departPos.x = ligSoko;
+    departPos.y = colSoko;
+
     charger_deplacements(t, fichierDep, &nbDeplacementsTotal);
-    
-    for(int i = 0; i < nbDeplacementsTotal; i++){
-        int ligAncienne = ligSoko, colAncienne = colSoko;
-        system("clear");
-        afficher_entete(fichier, nbDeplacements);
-        afficher_plateau(plateau);
-        deplacement(plateau, t[i], &ligSoko, &colSoko, &signalCaisse);
-        usleep(PAUSE);
-        if(ligAncienne != ligSoko || colAncienne != colSoko){
-            nbDeplacements++;
-            tPos[i].x = ligSoko;
-            tPos[i].y = colSoko;
-        }
-        else{
-            for(int a = i; a < nbDeplacementsTotal; a++){
-                nbDeplacements--;
-                t[a] = t[a+1];
-            }
-        }
-        opti_dep(tPos, t, ligSoko, colSoko, signalCaisse, i, &depart, &nbDeplacements);
-        
-    }
+    nbDeplacementsRestants = nbDeplacementsTotal;
+
+    optimiser_deplacements(plateau, t, historiquePos, departPos, &nbDeplacementsRestants, &ligSoko, &colSoko, fichier);
+
+    system("clear");
+    afficher_entete(fichier, nbDeplacementsRestants);
+    afficher_plateau(plateau);
 
     bool res = traiter_victoire(plateau);
-    
-    afficher_resultat(plateau, fichier, fichierDep, nbDeplacements, res, nbDeplacementsTotal);
+    afficher_resultat(plateau, fichier, fichierDep, nbDeplacementsRestants, res, nbDeplacementsTotal, t);
 
     return 0;
 }
 
+void optimiser_deplacements(typePlateau plateau, typeDeplacements dep,
+                            typePosition historique, position posDepart,
+                            int *nbDep, int *ligSoko, int *colSoko, char fichier[50])
+{
+    int indiceDerniereCaisse = -1;
+    int deplacementCaisse;
 
+    for (int i = 0; i < *nbDep; i++) {
 
-/* ==== FONCTIONS ==== */
+        int ancienneLig = *ligSoko;
+        int ancienneCol = *colSoko;
 
+        system("clear");
+        afficher_entete(fichier, i);
+        afficher_plateau(plateau);
+        deplacement(plateau, dep[i], ligSoko, colSoko, &deplacementCaisse);
+        usleep(PAUSE);
 
-/* affiche les infos de la partie (en-tête) */
-void afficher_entete(char fichier[50], int nbDeplacements) {
-    printf("Partie %s \n", fichier);
-    printf("Nombre de déplacements : %d\n", nbDeplacements);
+        /* Suppression des déplacements impossibles */
+        if (*ligSoko == ancienneLig && *colSoko == ancienneCol) {
+            for (int k = i; k < *nbDep - 1; k++) {
+                dep[k] = dep[k + 1];
+            }
+            (*nbDep)--;
+            i--;
+            continue;
+        }
+
+        /* Sauvegarde de la position courante */
+        historique[i].x = *ligSoko;
+        historique[i].y = *colSoko;
+
+        /* Si une caisse est déplacée, on met à jour la référence */
+        if (deplacementCaisse) {
+            indiceDerniereCaisse = i;
+            continue;
+        }
+
+        /* Recherche d’une boucle inutile sans déplacement de caisse */
+        int debutRecherche;
+        if (indiceDerniereCaisse == -1) {
+            debutRecherche = 0;
+        } else {
+            debutRecherche = indiceDerniereCaisse;
+        }
+
+        for (int k = i - 1; k >= debutRecherche; k--) {
+            if (historique[k].x == *ligSoko && historique[k].y == *colSoko) {
+
+                int nbASupprimer = i - k;
+                for (int m = i + 1; m < *nbDep; m++) {
+                    dep[m - nbASupprimer] = dep[m];
+                }
+
+                *nbDep -= nbASupprimer;
+                i = k;
+                break;
+            }
+        }
+    }
 }
 
-/* affiche le plateau de jeu */
+
+
+void afficher_entete(char fichier[50], int nbDeplacements) {
+    printf("Partie %s \n", fichier);
+    printf("Deplacement numero : %d\n", nbDeplacements);
+}
+
 void afficher_plateau(typePlateau plateau) {
     for (int lig = 0; lig < TAILLE; lig++) {
         printf("\n");
         for (int col = 0; col < TAILLE; col++) {
             char c = plateau[lig][col];
-
-            /* on remplace les états "sur cible" par les symboles normaux */
             if (c == SOKOBAN_SUR_CIBLE) c = SOKOBAN;
             if (c == CAISSE_SUR_CIBLE) c = CAISSE;
-
             printf("%c", c);
         }
     }
+    printf("\n");
 }
 
-/* enlève le Sokoban d'une case */
 char retirer_sokoban(char contenuCase) {
     if (contenuCase == SOKOBAN_SUR_CIBLE) return CIBLE;
     if (contenuCase == SOKOBAN) return VIDE;
     return contenuCase;
 }
 
-/* place le Sokoban sur une case */
 char afficher_sokoban(char contenuCase) {
     if (contenuCase == CIBLE) return SOKOBAN_SUR_CIBLE;
     if (contenuCase == VIDE) return SOKOBAN;
     return contenuCase;
 }
 
-/* enlève une caisse d'une case */
 char retirer_caisse(char contenuCase) {
     if (contenuCase == CAISSE_SUR_CIBLE) return CIBLE;
     if (contenuCase == CAISSE) return VIDE;
     return contenuCase;
 }
 
-/* place une caisse sur une case */
 char afficher_caisse(char contenuCase) {
     if (contenuCase == CIBLE) return CAISSE_SUR_CIBLE;
     if (contenuCase == VIDE) return CAISSE;
@@ -160,9 +197,8 @@ char afficher_caisse(char contenuCase) {
 }
 
 void deplacement(typePlateau plateau, char t, int *ligSoko, int *colSoko, int *signalCaisse) {
-
     int dlig = 0, dcol = 0;
-    signalCaisse = 0;
+    *signalCaisse = 0;
 
     switch (t) {
         case SOKOH:  dlig = -1; break;
@@ -181,15 +217,12 @@ void deplacement(typePlateau plateau, char t, int *ligSoko, int *colSoko, int *s
     int ligDerriere  = ligSuivante + dlig;
     int colDerriere  = colSuivante + dcol;
 
-    if (ligSuivante < 0 || ligSuivante >= TAILLE || colSuivante < 0 || colSuivante >= TAILLE){
-        return;
-    }
+    if (ligSuivante < 0 || ligSuivante >= TAILLE || colSuivante < 0 || colSuivante >= TAILLE) return;
 
     char caseSuivante = plateau[ligSuivante][colSuivante];
 
-    if (caseSuivante == MUR && *signalCaisse == 0){
-        return;
-    }
+    if (caseSuivante == MUR && *signalCaisse == 0) return;
+
     if ((caseSuivante == VIDE || caseSuivante == CIBLE) && *signalCaisse == 0) {
         plateau[*ligSoko][*colSoko] = retirer_sokoban(plateau[*ligSoko][*colSoko]);
         plateau[ligSuivante][colSuivante] = afficher_sokoban(plateau[ligSuivante][colSuivante]);
@@ -197,29 +230,24 @@ void deplacement(typePlateau plateau, char t, int *ligSoko, int *colSoko, int *s
         *colSoko = colSuivante;
         return;
     }
+
     if ((caseSuivante == CAISSE || caseSuivante == CAISSE_SUR_CIBLE) && *signalCaisse == 1) {
-        if (ligDerriere < 0 || ligDerriere >= TAILLE || colDerriere < 0 || colDerriere >= TAILLE){
-            return;
-        }
+        if (ligDerriere < 0 || ligDerriere >= TAILLE || colDerriere < 0 || colDerriere >= TAILLE) return;
 
         char caseDerriere = plateau[ligDerriere][colDerriere];
+        if (caseDerriere == MUR || caseDerriere == CAISSE || caseDerriere == CAISSE_SUR_CIBLE) return;
 
-        if (caseDerriere == MUR || caseDerriere == CAISSE || caseDerriere == CAISSE_SUR_CIBLE){
-            return;
-        }
         plateau[ligDerriere][colDerriere] = afficher_caisse(caseDerriere);
         plateau[ligSuivante][colSuivante] = retirer_caisse(plateau[ligSuivante][colSuivante]);
-
         plateau[*ligSoko][*colSoko] = retirer_sokoban(plateau[*ligSoko][*colSoko]);
         plateau[ligSuivante][colSuivante] = afficher_sokoban(plateau[ligSuivante][colSuivante]);
-
+        
         *ligSoko = ligSuivante; 
         *colSoko = colSuivante;
         return;
     }
 }
 
-/* recherche la position du Sokoban sur le plateau */
 void trouver_sokoban(typePlateau plateau, int *ligSoko, int *colSoko) {
     for (int lig = 0; lig < TAILLE; lig++) {
         for (int col = 0; col < TAILLE; col++) {
@@ -231,7 +259,6 @@ void trouver_sokoban(typePlateau plateau, int *ligSoko, int *colSoko) {
     }
 }
 
-/* teste si la partie est gagnée (toutes les cibles ont une caisse) */
 bool traiter_victoire(typePlateau plateau) {
     for (int lig = 0; lig < TAILLE; lig++) {
         for (int col = 0; col < TAILLE; col++) {
@@ -243,26 +270,24 @@ bool traiter_victoire(typePlateau plateau) {
     return true;
 }
 
-
-/* affiche l'écran final de victoire avec le plateau */
-void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal) {
-
+void afficher_resultat(typePlateau plateau, char fichier[50], char fichierDep[50], int nb, bool r, int nbDeplacementsTotal, typeDeplacements tOpti) {
     char rep;
-    system("clear");
-    afficher_entete(fichier, nb);
-    afficher_plateau(plateau);
-
+    
     if(r){
-        printf("La suite de déplacements %s est bien une solution pour la partie %s\n", fichierDep, fichier);
-        printf("Elle contient intitialement %d caractères", nbDeplacementsTotal);
-        printf("Apres optimisation elle contient %s caracteres. Souhaitez-vous l'enregistrer (O/N) ?", fichierDep, fichier, nb);
-            if(rep = O)
-            else
+        printf("La suite de deplacements %s est bien une solution pour la partie %s\n", fichierDep, fichier);
+        printf("Elle contient initialement %d caracteres.\n", nbDeplacementsTotal);
+        printf("Apres optimisation elle contient %d caracteres.\n", nb);
+        
+        printf("Souhaitez-vous l'enregistrer (O/N) ? ");
+        scanf(" %c", &rep);
+
+        if(rep == 'O' || rep == 'o') {
+            sauvegarder_solution(fichierDep, tOpti, nb);
+        }
     }
     else{
-        printf("La suite de déplacements %s N’EST PAS une solution pour la partie %s\n", fichierDep, fichier);
+        printf("La suite de deplacements %s N'EST PAS une solution pour la partie %s\n", fichierDep, fichier);
     }
-
 }
 
 void charger_partie(typePlateau plateau, char fichier[50]){
@@ -271,7 +296,7 @@ void charger_partie(typePlateau plateau, char fichier[50]){
 
     f = fopen(fichier, "r");
     if (f==NULL){
-        printf("ERREUR SUR FICHIER");
+        printf("ERREUR SUR FICHIER PARTIE\n");
         exit(EXIT_FAILURE);
     } else {
         for (int ligne=0 ; ligne<TAILLE ; ligne++){
@@ -291,44 +316,38 @@ void charger_deplacements(typeDeplacements t, char fichier[50], int * nb){
 
     f = fopen(fichier, "r");
     if (f==NULL){
-        printf("FICHIER NON TROUVE\n");
+        printf("FICHIER DEPLACEMENTS NON TROUVE\n");
     } else {
         fread(&dep, sizeof(char), 1, f);
         if (feof(f)){
             printf("FICHIER VIDE\n");
         } else {
-            while (!feof(f)){
-                t[*nb] = dep;
-                (*nb)++;
+            while (!feof(f) && *nb < NB_D_MAX){
+                if(isalpha(dep)) { 
+                    t[*nb] = dep;
+                    (*nb)++;
+                }
                 fread(&dep, sizeof(char), 1, f);
             }
         }
+        fclose(f);
     }
-    fclose(f);
 }
 
-void opti_dep(typePosition tPos, typeDeplacements t,
-    int ligSoko, int colSoko, int signalCaisse, int i,
-    int *depart, int *nbDeplacements){
+void sauvegarder_solution(char fichierDep[50], typeDeplacements t, int nb) {
+    char nomFichier[60];
+    printf("Entrez le nom du fichier de sauvegarde (ex: opti.dep) : ");
+    scanf("%s", nomFichier);
 
-    int nbPos = 0;
-    if(signalCaisse == 1){
-        *depart = t[i];
+    FILE *f = fopen(nomFichier, "w");
+    if (f == NULL) {
+        printf("Erreur lors de la creation du fichier.\n");
+        return;
     }
-    for(int j = *depart ; j < nbPos; j++){
-        if(ligSoko == tPos[j].x && colSoko == tPos[j].y){
-            tPos[j].x = 0;
-            tPos[j].y = 0;
-            t[j] = 0;
-            j--;
-            nbDeplacements--;
-            while(tPos[j].x != ligSoko && tPos[j].y != colSoko){
-                tPos[j].x = 0;
-                tPos[j].y = 0;
-                t[j] = 0;
-                j--;
-                nbDeplacements--;
-            }
-        }
+    
+    for(int i=0; i < nb; i++) {
+        fprintf(f, "%c", t[i]);
     }
+    fclose(f);
+    printf("Sauvegarde terminee dans %s.\n", nomFichier);
 }
