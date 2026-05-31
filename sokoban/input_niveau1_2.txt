@@ -1,2 +1,0 @@
-niveau1.sok
-niveau1_2.dep
